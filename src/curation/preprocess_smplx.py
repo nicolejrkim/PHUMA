@@ -59,7 +59,7 @@ def main(args):
 
     robust_ground_y = find_robust_ground(vertices, foot_contact_vertex_indices)
 
-    foot_contacts = get_foot_contact(vertices, foot_contact_vertex_indices, robust_ground_y)
+    foot_contacts = get_foot_contact(vertices, foot_contact_vertex_indices, robust_ground_y, 0.05)
 
     motion_parms['transl'][:, 1] -= robust_ground_y
     joints[..., 1] -= robust_ground_y
