@@ -6,6 +6,7 @@ import yaml
 import torch
 import torch.nn.functional as F 
 import numpy as np
+import mujoco
 import smplx
 from smplx.joint_names import JOINT_NAMES 
 from tqdm import tqdm 
@@ -164,6 +165,32 @@ def main(args):
     mjcf_file = join(robot_model_dir, "custom.xml")
     retarget = HumanoidRetargetKeypoint(mjcf_file=mjcf_file, device=args.device)
 
+    # Resolve which body each joint actuates directly from the MJCF, instead of
+    # substring-matching joint names against body names. The substring approach
+    # silently drops every joint whose name does not contain its body's name
+    # (e.g. K1's `Left_Elbow_Pitch` actuating body `Left_Arm_3`), which froze all
+    # non-hip joints for robots that don't follow the `<name>_joint`/`<name>_link`
+    # convention. Falls back to the legacy substring match when the MJCF-resolved
+    # body is absent from `body_names`, so convention-following robots are unchanged.
+    _mj_model = mujoco.MjModel.from_xml_path(mjcf_file)
+    _jname_to_bodyname = {}
+    for _j in range(_mj_model.njnt):
+        _jn = mujoco.mj_id2name(_mj_model, mujoco.mjtObj.mjOBJ_JOINT, _j)
+        _bn = mujoco.mj_id2name(_mj_model, mujoco.mjtObj.mjOBJ_BODY, int(_mj_model.jnt_bodyid[_j]))
+        _jname_to_bodyname[_jn] = _bn
+    robot_joint_body_idx = []
+    for k, joint_name in enumerate(robot_config["joint_names"]):
+        if k == 0:
+            robot_joint_body_idx.append(-1)  # free joint handled via root_ori
+            continue
+        body_name = _jname_to_bodyname.get(joint_name)
+        if body_name is not None and body_name in robot_link_map:
+            robot_joint_body_idx.append(robot_link_map[body_name])
+        else:
+            key = joint_name.removesuffix("_joint")
+            robot_joint_body_idx.append(
+                next((l for l, b in enumerate(robot_config["body_names"]) if key in b), -1))
+
     rotation = R.from_rotvec(global_orient)
     root_ori_matrix = rotation.as_matrix()
 
@@ -241,18 +268,15 @@ def main(args):
         
         pose_batch[0, :, 0, :] = root_ori
         joint_axes = robot_config.get("joint_axes")
-        for k, joint_name in enumerate(robot_config["joint_names"]):
-            if k == 0:
-                continue  # skip free joint entry
-            key = joint_name.removesuffix("_joint")
-            for l, body_name in enumerate(robot_config["body_names"]):
-                if key in body_name:
-                    if joint_axes is not None:
-                        axis = torch.tensor(joint_axes[k], dtype=torch.float32, device=retarget.device)
-                        pose_batch[0, :, l, :] = joint_pos[:, k-1:k] * axis.unsqueeze(0)
-                    else:
-                        pose_batch[0, :, l, robot_config["dof"][k]] = joint_pos[:, k-1]
-                    break
+        for k in range(1, len(robot_config["joint_names"])):
+            l = robot_joint_body_idx[k]
+            if l < 0:
+                continue  # free joint, or unmatched
+            if joint_axes is not None:
+                axis = torch.tensor(joint_axes[k], dtype=torch.float32, device=retarget.device)
+                pose_batch[0, :, l, :] = joint_pos[:, k-1:k] * axis.unsqueeze(0)
+            else:
+                pose_batch[0, :, l, robot_config["dof"][k]] = joint_pos[:, k-1]
 
         output = retarget.robot.kinematics.fk_batch( 
             pose=pose_batch,
