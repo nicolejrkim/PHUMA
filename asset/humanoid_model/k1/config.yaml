@@ -9,12 +9,12 @@ bone_mapping:
 - [pelvis, right_hip, Trunk, Right_Hip_Roll]
 - [right_hip, right_knee, Right_Hip_Roll, Right_Shank]
 - [right_knee, right_ankle, Right_Shank, Right_Ankle_Cross]
-- [pelvis, left_shoulder, Trunk, Left_Arm_3]
-- [left_shoulder, left_elbow, Left_Arm_3, left_hand_link]
-- [left_elbow, left_wrist, left_hand_link, left_wrist_keypoint]
-- [pelvis, right_shoulder, Trunk, Right_Arm_3]
-- [right_shoulder, right_elbow, Right_Arm_3, right_hand_link]
-- [right_elbow, right_wrist, right_hand_link, right_wrist_keypoint]
+- [pelvis, left_shoulder, Trunk, Left_Arm_1]
+- [left_shoulder, left_elbow, Left_Arm_1, Left_Arm_3]
+- [left_elbow, left_wrist, Left_Arm_3, left_hand_link]
+- [pelvis, right_shoulder, Trunk, Right_Arm_1]
+- [right_shoulder, right_elbow, Right_Arm_1, Right_Arm_3]
+- [right_elbow, right_wrist, Right_Arm_3, right_hand_link]
 keypoints:
 - {name: pelvis, body: Trunk}
 - {name: left_hip_keypoint, body: Left_Hip_Roll}
@@ -28,12 +28,12 @@ keypoints:
 - {name: right_heel_keypoint, body: right_heel_keypoint}
 - {name: right_toe_keypoint, body: right_toe_keypoint}
 - {name: torso_keypoint, body: Trunk}
-- {name: left_shoulder_keypoint, body: Left_Arm_3}
-- {name: left_elbow_keypoint, body: left_hand_link}
-- {name: left_wrist_keypoint, body: left_wrist_keypoint}
-- {name: right_shoulder_keypoint, body: Right_Arm_3}
-- {name: right_elbow_keypoint, body: right_hand_link}
-- {name: right_wrist_keypoint, body: right_wrist_keypoint}
+- {name: left_shoulder_keypoint, body: Left_Arm_1}
+- {name: left_elbow_keypoint, body: Left_Arm_3}
+- {name: left_wrist_keypoint, body: left_hand_link}
+- {name: right_shoulder_keypoint, body: Right_Arm_1}
+- {name: right_elbow_keypoint, body: Right_Arm_3}
+- {name: right_wrist_keypoint, body: right_hand_link}
 body_names: [Trunk, Head_1, Head_2, Left_Arm_1, Left_Arm_2, Left_Arm_3, left_hand_link,
   Right_Arm_1, Right_Arm_2, Right_Arm_3, right_hand_link, Left_Hip_Pitch, Left_Hip_Roll,
   Left_Hip_Yaw, Left_Shank, Left_Ankle_Cross, left_foot_link, left_heel_keypoint,
