@@ -4,8 +4,9 @@ import argparse
 import yaml
 
 import torch
-import torch.nn.functional as F 
+import torch.nn.functional as F
 import numpy as np
+import mujoco
 import smplx
 from smplx.joint_names import JOINT_NAMES 
 from tqdm import tqdm 
@@ -213,7 +214,24 @@ def main(args):
     min_vals = retarget.robot.joints_range[:, 0] 
     max_vals = retarget.robot.joints_range[:, 1] 
 
-    vel_limits = torch.tensor(robot_config['joint_velocity_limits'], device=retarget.device, dtype=torch.float32) 
+    vel_limits = torch.tensor(robot_config['joint_velocity_limits'], device=retarget.device, dtype=torch.float32)
+
+    # Resolve each actuated joint to the body it drives, straight from the MJCF
+    # (every <joint> lives in exactly one <body>), so retargeting is agnostic to
+    # naming convention. The earlier name-substring match assumed Unitree's
+    # 'X_joint' <-> 'X_link' pairing and silently froze every joint on robots
+    # that name joints and bodies independently (e.g. Booster T1/K1).
+    joint_axes = robot_config.get("joint_axes")
+    _mj_model = mujoco.MjModel.from_xml_path(mjcf_file)
+    _jnt_bodyname = {_mj_model.joint(j).name: _mj_model.body(_mj_model.jnt_bodyid[j]).name
+                     for j in range(_mj_model.njnt)}
+    joint_body_idx = [robot_link_map.get(_jnt_bodyname.get(jn), -1)
+                      for jn in robot_config["joint_names"]]
+    _frozen = [jn for k, (jn, li) in enumerate(zip(robot_config["joint_names"], joint_body_idx))
+               if k > 0 and li < 0]
+    if _frozen:
+        print(f"[motion_adaptation] WARNING: {len(_frozen)} joint(s) did not resolve to a "
+              f"body and will not be actuated: {_frozen}")
 
     for i in tqdm(range(args.num_iter_dof)):
         optimizer.zero_grad()
@@ -240,19 +258,15 @@ def main(args):
             dtype=torch.float32, device=retarget.device) 
         
         pose_batch[0, :, 0, :] = root_ori
-        joint_axes = robot_config.get("joint_axes")
-        for k, joint_name in enumerate(robot_config["joint_names"]):
-            if k == 0:
-                continue  # skip free joint entry
-            key = joint_name.removesuffix("_joint")
-            for l, body_name in enumerate(robot_config["body_names"]):
-                if key in body_name:
-                    if joint_axes is not None:
-                        axis = torch.tensor(joint_axes[k], dtype=torch.float32, device=retarget.device)
-                        pose_batch[0, :, l, :] = joint_pos[:, k-1:k] * axis.unsqueeze(0)
-                    else:
-                        pose_batch[0, :, l, robot_config["dof"][k]] = joint_pos[:, k-1]
-                    break
+        for k in range(1, len(robot_config["joint_names"])):  # index 0 = free joint
+            l = joint_body_idx[k]
+            if l < 0:
+                continue  # joint did not resolve to a body (warned above)
+            if joint_axes is not None:
+                axis = torch.tensor(joint_axes[k], dtype=torch.float32, device=retarget.device)
+                pose_batch[0, :, l, :] = joint_pos[:, k-1:k] * axis.unsqueeze(0)
+            else:
+                pose_batch[0, :, l, robot_config["dof"][k]] = joint_pos[:, k-1]
 
         output = retarget.robot.kinematics.fk_batch( 
             pose=pose_batch,
