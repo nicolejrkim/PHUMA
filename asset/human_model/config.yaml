@@ -30,3 +30,5 @@ keypoints:
   - { name: 'right_shoulder_keypoint',body: 'right_shoulder',}
   - { name: 'right_elbow_keypoint',   body: 'right_elbow',   }
   - { name: 'right_wrist_keypoint',   body: 'right_wrist',   }
+  - { name: 'left_hand_tip_keypoint', body: 'left_middle1',  }
+  - { name: 'right_hand_tip_keypoint',body: 'right_middle1', }

@@ -279,9 +279,10 @@ def main(args):
             batch_len, num_keypoint, 3, 
             dtype=torch.float32, device=retarget.device) 
         keypoint[:, :] = output_trans[:, robot_keypoint_indices] 
-        keypoint_weights = torch.tensor([ 
-            0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  
-            0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],  
+        _kp_w = [0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        _kp_w += [1.0] * (num_keypoint - len(_kp_w))  # extra keypoints (e.g. T1 hand tips)
+        keypoint_weights = torch.tensor(_kp_w,
             device=retarget.device, dtype=torch.float32).view(1, num_keypoint)
 
         loss_retarget_full = (torch.abs(keypoint - keypoint_gt) * keypoint_weights.unsqueeze(-1))
@@ -297,7 +298,7 @@ def main(args):
 
         loss_scale_unit = F.mse_loss(link_scales, torch.ones_like(link_scales)) 
 
-        reshaped_scales = link_scales.view(-1, 6)
+        reshaped_scales = link_scales[:(link_scales.shape[0] // 6) * 6].view(-1, 6)
         left_scales = reshaped_scales[:, :3].reshape(-1)
         right_scales = reshaped_scales[:, 3:].reshape(-1)
         loss_scale_symmetry = F.mse_loss(left_scales, right_scales) 
